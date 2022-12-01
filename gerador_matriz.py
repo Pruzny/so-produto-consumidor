@@ -1,5 +1,6 @@
 from sys import argv
 from random import random
+from os import remove, listdir
 
 reserved = {
     "-n": "N",
@@ -10,7 +11,7 @@ reserved = {
 }
 
 values = {
-    "N": 10,
+    "N": 50,
     "I": 10,
     "J": 10,
     "MIN": -1,
@@ -28,11 +29,19 @@ J = int(values["J"])
 MIN = float(values["MIN"])
 MAX = float(values["MAX"])
 
+for filename in listdir("files"):
+    if ".in" in filename:
+        remove(f"files/{filename}")
+file_list = open("files/entrada.in", "w")
 for n in range(N):
-    file = open(f"matriz{n}.txt", "w")
-    for i in range(I):
-        for j in range(J):
-            value = random() * (MAX - MIN) + MIN
-            file.write(f"{value:.1f} ")
+    file = open(f"files/matriz{n}.in", "w")
+    for _ in range(2):
+        for i in range(I):
+            for j in range(J):
+                value = random() * (MAX - MIN) + MIN
+                file.write(f"{value:.1f} ")
+            file.write("\n")
         file.write("\n")
     file.close()
+    file_list.write(f"matriz{n}.in\n")
+file_list.close()
