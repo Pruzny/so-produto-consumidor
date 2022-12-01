@@ -2,15 +2,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include </usr/include/semaphore.h>
+#include <string.h>
 
 #define BUFF_SIZE   5		/* total number of slots */
 #define NP          3		/* total number of producers */
 #define NCP         3		/* total number of consumers/producers */
 #define NC          3		/* total number of consumers */
 #define NITERS      4		/* number of items produced/consumed */
+#define PATH "files/"
+#define N 5
+#define ORDER_MATRIX 10
+#define ORDER_VETOR 10
+
+
+typedef struct  {
+    char nome[50];
+    double** matrizA;
+    double** matrizB;
+    double** matrizC;
+    double* vetor;
+    double E;
+
+} S;
+
 
 typedef struct {
-    int buf[BUFF_SIZE];   /* shared var */
+    S* buf[BUFF_SIZE];   /* shared var */
     int in;         	  /* buf[in%BUFF_SIZE] is the first empty slot */
     int out;        	  /* buf[out%BUFF_SIZE] is the first full slot */
     sem_t full;     	  /* keep track of the number of full spots */
@@ -20,63 +37,121 @@ typedef struct {
 
 sbuf_t shared[3];
 
-
-typedef struct  {
-    char nome[50];
-    int** matrizA;
-    int** matrizB;
-    int** matrizC;
-    int* vetor;
-    double E;
-
-} S;
-
-void read_matrix_archive(char *name_archive, float **a, int order_matrix) {
-    FILE *archive;
-    archive = fopen(name_archive, "r");
-    if (archive != NULL) {
-        float n;
-        while (!feof(archive)) {
-            for (int i = 0; i < order_matrix; i++) {
-                for (int j = 0; j < order_matrix; j++) {
-                    fscanf(archive, "%f ", &n);
-                    a[i][j] = n;
-                }
-            }
-        }
-        fclose(archive);
-    }
-}
+typedef struct {
+    double **matrizA;
+    double **matrizB;
+} matrizes;
 
 
-void printMatrix(float **a, int order_matrix) {
+void printMatrix(double **a, int order_matrix) {
    for (int i = 0; i < order_matrix; i++) {
         for (int j = 0; j < order_matrix; j++) {
-            printf("%f ", a[i][j]);
+            printf("%lf ", a[i][j]);
         }
         printf("\n");
    }
    printf("\n");
 }
 
-float** alloc_matrix(int number_rows, int number_collumns) {
-    float **matrix;
-    matrix = (float **) malloc(number_rows * sizeof(float *));
+double** alloc_matrix(int number_rows, int number_collumns) {
+    double **matrix;
+    matrix = (double **) malloc(number_rows * sizeof(double *));
     for(int i = 0; i < number_rows; i++) {
-        matrix[i] = (float *)malloc(number_collumns * sizeof(float));
+        matrix[i] = (double *)malloc(number_collumns * sizeof(double));
     }
     return matrix;
 }
 
-float* alloc_vetor(int n) {
-    float *v =  (float *)malloc(n * sizeof(float));
+double* alloc_vetor(int n) {
+    double *v =  (double *)malloc(n * sizeof(double));
     for(int i = 0; i < n; i++) {
         v[i] = 0;
     }
 }
 
-float** multiplica_matriz(float **a, float **b, int order_matrix) {
-    float **c = alloc_matrix(order_matrix, order_matrix);
+S ** alloc_struct_S(int n, int order_matrix, int order_vetor) {
+    S **structure = (S **) malloc(sizeof(S*)*n);
+     for (int i= 0; i < n; i++){
+        structure[i] = (S *) malloc(sizeof(S));
+        structure[i]->matrizA = alloc_matrix(order_matrix, order_matrix);
+        structure[i]->matrizB = alloc_matrix(order_matrix, order_matrix);
+        structure[i]->matrizC = alloc_matrix(order_matrix, order_matrix);
+        structure[i]->vetor = alloc_vetor(order_vetor);
+     }
+
+    return structure;
+}
+
+matrizes ** alloc_struct_matrizes(int n, int order_matrix) {
+    matrizes **matrizes_retornadas = (matrizes **) malloc(sizeof(matrizes*)*n);
+    for (int i= 0; i < n; i++){
+        matrizes_retornadas[i] = (matrizes *) malloc(sizeof(matrizes));
+        matrizes_retornadas[i]->matrizA = alloc_matrix(order_matrix,order_matrix);
+        matrizes_retornadas[i]->matrizB = alloc_matrix(order_matrix,order_matrix);
+    }
+    return matrizes_retornadas;
+}
+
+
+void read_matrix_archive(char *name_archive, double **a, double **b, int order_matrix) {
+    FILE *archive_matrix;
+    char path_archive_matrix[80];
+    strcpy(path_archive_matrix, PATH);
+    strcat(path_archive_matrix, name_archive);
+
+    archive_matrix = fopen(path_archive_matrix, "r");
+    if (archive_matrix != NULL) {
+        double n;
+        for (int i = 0; i < order_matrix; i++) {
+            for (int j = 0; j < order_matrix; j++) {
+                fscanf(archive_matrix, "%lf ", &n);
+                a[i][j] = n;
+            }
+        }
+        fscanf(archive_matrix, "\n", &n);
+        for (int i = 0; i < order_matrix; i++) {
+            for (int j = 0; j < order_matrix; j++) {
+                fscanf(archive_matrix, "%lf ", &n);
+                b[i][j] = n;
+            }
+        }
+        fclose(archive_matrix);
+    } else {
+         printf("Houve um problema ao abrir o arquivo %s, verifique o diretório\n", name_archive);
+    }
+}
+
+matrizes **alloc_matrix_from_archive(char *name_archive, int order_matrix) {
+    matrizes **matrizes1 = alloc_struct_matrizes(1, order_matrix);
+    read_matrix_archive(name_archive, matrizes1[0]->matrizA, matrizes1[0]->matrizB, order_matrix);
+    return matrizes1;
+}
+
+matrizes ** read_entrada_in(S **estrutura, char *name_archive, int order_matrix) {
+    FILE *archive;
+    int count = 0;
+    char path_archive[80];
+    matrizes **matrizes_retorno;
+    strcpy(path_archive, PATH);
+    archive = fopen(strcat(path_archive, name_archive), "r");
+    if (archive != NULL) {
+        char str[100];
+        while (!feof(archive)) {
+            fscanf(archive, "%s\n", str);
+            matrizes_retorno = alloc_matrix_from_archive(str, order_matrix);
+            estrutura[count]->matrizA = matrizes_retorno[0]->matrizA;
+            estrutura[count]->matrizB = matrizes_retorno[0]->matrizB;
+            count++;
+        }
+        fclose(archive);
+    } else {
+        printf("Houve um problema ao abrir o arquivo %s, verifique o diretório\n", name_archive);
+    }
+    return estrutura;
+}
+
+double** multiplica_matriz(double **a, double **b, int order_matrix) {
+    double **c = alloc_matrix(order_matrix, order_matrix);
 
     for (int i = 0; i < 10; i++) {
         for (int j = 0; j < 10; j++) {
@@ -90,32 +165,28 @@ float** multiplica_matriz(float **a, float **b, int order_matrix) {
 }
 
 /*P - Thread produtora - Le um arquivo (entrada.in) contendo uma lista de 50 arquivos
-de entrada (um nome de arquivo por linha), cada um contendo duas matrizes quadradas
-de ordem 10 de doubles.
+de entrada (um nome de arquivo por linha), cada um contendo duas matrizes quadradas de ordem 10 de doubles.
  A cada arquivo lida, a thread produtora cria dinamicamente uma estrutura S, preenche o nome do arquivo de entrada, alem de A e B e coloca o ponteiro para
  a estrutura S em shared[0].buffer[in] para ser processada pela etapa seguinte. S ́o teremos 1
 instancia desta thread.
  */
 
 void *Producer(void *arg) {
-    int i, item, index;
-
-    index = *((int *)arg);
-
+    int i; index;
+    S ** estrutura = alloc_struct_S(N, ORDER_MATRIX, ORDER_VETOR);
     for (i=0; i < NITERS; i++) {
 
         /* Produce item */
-        item = i+(index*1000);
-
+        //matrizes **matrizes1 = alloc_struct_matrizes(N, ORDER_MATRIX);
+        read_entrada_in(estrutura, "entrada.in", ORDER_MATRIX);
         /* Prepare to write item to buf */
 
         /* If there are no empty slots, wait */
         sem_wait(&shared[0].empty);
         /* If another thread uses the buffer, wait */
         sem_wait(&shared[0].mutex);
-        shared[0].buf[shared[0].in] = item;
+        shared[0].buf[shared[0].in] = estrutura[0]; //TODO
         shared[0].in = (shared[0].in+1)%BUFF_SIZE;
-        printf("[P_%d] Producing %d ...\n", index, item);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[0].mutex);
@@ -194,19 +265,7 @@ void *Consumer(void *arg)
     return NULL;
 }
 
-int main()
-{
-    float **a = alloc_matrix(10, 10);
-    read_matrix_archive("matriz0.txt", a, 10);
-    printMatrix(a, 10);
-
-    float **b = alloc_matrix(10, 10);
-    read_matrix_archive("matriz1.txt", b, 10);
-    printMatrix(b, 10);
-
-    float **c = multiplica_matriz(a, b, 10);
-    printMatrix(c, 10);
-
+int main() {
     pthread_t idP, idC, idCP;
     int index;
     int sP[NP], sC[NC], sCP[NCP];
