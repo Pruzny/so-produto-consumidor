@@ -5,9 +5,11 @@
 #include <string.h>
 
 #define BUFF_SIZE   5		/* total number of slots */
-#define NP          3		/* total number of producers */
-#define NCP         3		/* total number of consumers/producers */
-#define NC          3		/* total number of consumers */
+#define NP          1		/* total number of producers */
+#define NCP1        5		/* total number of consumers/producers CP1*/
+#define NCP2        4		/* total number of consumers/producers CP1*/
+#define NCP3        3		/* total number of consumers/producers CP1*/
+#define NC          1		/* total number of consumers */
 #define NITERS      4		/* number of items produced/consumed */
 #define PATH "files/"       /* Diretório dos arquivos de entrada.in */
 #define N 5                 /* Quantidade de arquivos */
@@ -275,33 +277,7 @@ void *ConsumerProducer(void *arg) {
         sem_post(&shared[1].full);
 
     }
-    return NULL;
-}
-
-void *Consumer(void *arg)
-{
-    int i, item, index;
-
-    index = *((int *)arg);
-
-    for (i=0; i < NITERS; i++) {
-
-        /* Prepare to read item from buf */
-
-        /* If there are no filled slots, wait */
-        sem_wait(&shared[1].full);
-        /* If another thread uses the buffer, wait */
-        sem_wait(&shared[1].mutex);
-        item = shared[1].buf[shared[1].out];
-        shared[1].out = (shared[1].out+1)%BUFF_SIZE;
-        printf("[C_%d] Consuming %d ...\n", index, item);
-        fflush(stdout);
-        /* Release the buffer */
-        sem_post(&shared[1].mutex);
-        /* Increment the number of empty slots */
-        sem_post(&shared[1].empty);
-
-    }
+    printf("Isadora1\n");
     return NULL;
 }
 
@@ -464,8 +440,7 @@ int main() {
     	sem_init(&shared[index].mutex, 0, 1);
     }
 
-    for (index = 0; index < NP; index++)
-    {
+    for (index = 0; index < NP; index++) {
        sP[index]=index;
        /* Create a new producer */
        pthread_create(&idP, NULL, Producer, &sP[index]);
@@ -490,12 +465,16 @@ int main() {
        pthread_create(&idCP3, NULL, ConsumerProducerCP3, &sCP3[index]);
     }
 
-    for (index = 0; index < NC; index++)
-    {
+    for (index = 0; index < NC; index++) {
        sC[index]=index;
        /* Create a new consumer */
        pthread_create(&idC, NULL, Consumer, &sC[index]);
+       pthread_join(idC, NULL);
     }
+    pthread_cancel(idP);
+    pthread_cancel(idCP1);
+    pthread_cancel(idCP2);
+    pthread_cancel(idCP3);
 
     pthread_exit(NULL);
 }
