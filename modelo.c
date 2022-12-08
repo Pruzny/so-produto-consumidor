@@ -9,18 +9,18 @@
 #define NCP         3		/* total number of consumers/producers */
 #define NC          3		/* total number of consumers */
 #define NITERS      4		/* number of items produced/consumed */
-#define PATH "files/"
-#define N 5
-#define ORDER_MATRIX 10
+#define PATH "files/"       /* Diretório dos arquivos de entrada.in */
+#define N 5                 /* Quantidade de arquivos */
+#define ORDER_MATRIX 10     /**/
 #define ORDER_VETOR 10
 
 
 typedef struct  {
     char nome[50];
-    double** matrizA;
-    double** matrizB;
-    double** matrizC;
-    double* vetor;
+    double **matrizA;
+    double **matrizB;
+    double **matrizC;
+    double *vetor;
     double E;
 
 } S;
@@ -33,6 +33,7 @@ typedef struct {
     sem_t full;     	  /* keep track of the number of full spots */
     sem_t empty;    	  /* keep track of the number of empty spots */
     sem_t mutex;    	  /* enforce mutual exclusion to shared data */
+    int teste;
 } sbuf_t;
 
 sbuf_t shared[3];
@@ -41,7 +42,6 @@ typedef struct {
     double **matrizA;
     double **matrizB;
 } matrizes;
-
 
 void printMatrix(double **a, int order_matrix) {
    for (int i = 0; i < order_matrix; i++) {
@@ -69,6 +69,7 @@ double* alloc_vetor(int n) {
     }
 }
 
+//buffer tamanho fixo dinamico
 S ** alloc_struct_S(int n, int order_matrix, int order_vetor) {
     S **structure = (S **) malloc(sizeof(S*)*n);
      for (int i= 0; i < n; i++){
@@ -91,7 +92,6 @@ matrizes ** alloc_struct_matrizes(int n, int order_matrix) {
     }
     return matrizes_retornadas;
 }
-
 
 void read_matrix_archive(char *name_archive, double **a, double **b, int order_matrix) {
     FILE *archive_matrix;
@@ -153,10 +153,10 @@ matrizes ** read_entrada_in(S **estrutura, char *name_archive, int order_matrix)
 double** multiplica_matriz(double **a, double **b, int order_matrix) {
     double **c = alloc_matrix(order_matrix, order_matrix);
 
-    for (int i = 0; i < 10; i++) {
-        for (int j = 0; j < 10; j++) {
+    for (int i = 0; i < order_matrix; i++) {
+        for (int j = 0; j < order_matrix; j++) {
             c[i][j] = 0;
-            for (int k = 0; k < 10; k++) {
+            for (int k = 0; k < order_matrix; k++) {
                 c[i][j] += a[i][k] * b[k][j];
             }
         }
@@ -164,72 +164,82 @@ double** multiplica_matriz(double **a, double **b, int order_matrix) {
     return c;
 }
 
-/*P - Thread produtora - Le um arquivo (entrada.in) contendo uma lista de 50 arquivos
-de entrada (um nome de arquivo por linha), cada um contendo duas matrizes quadradas de ordem 10 de doubles.
- A cada arquivo lida, a thread produtora cria dinamicamente uma estrutura S, preenche o nome do arquivo de entrada, alem de A e B e coloca o ponteiro para
- a estrutura S em shared[0].buffer[in] para ser processada pela etapa seguinte. S ́o teremos 1
-instancia desta thread.
- */
-
 void *Producer(void *arg) {
-    int i; index;
-    S ** estrutura = alloc_struct_S(N, ORDER_MATRIX, ORDER_VETOR);
-    for (i=0; i < NITERS; i++) {
+    int index = *((int *)arg);
+    S *estrutura = (S*)malloc(sizeof(S));
+    FILE *archive;
+    matrizes **matrizes_retorno;
+    int count = 0;
+    char path_archive[80];
+    strcpy(path_archive, PATH);
+    archive = fopen(strcat(path_archive, "entrada.in"), "r");
 
         /* Produce item */
-        //matrizes **matrizes1 = alloc_struct_matrizes(N, ORDER_MATRIX);
-        read_entrada_in(estrutura, "entrada.in", ORDER_MATRIX);
+        if (archive != NULL) {
+            char str[100];
+            while (!feof(archive)) {
+                fscanf(archive, "%s\n", str);
+                printf("Thread TID: %d\n", index);
+                matrizes_retorno = alloc_matrix_from_archive(str, ORDER_MATRIX);
+                estrutura->matrizA = matrizes_retorno[0]->matrizA;
+                estrutura->matrizB = matrizes_retorno[0]->matrizB;
+
+                 /* If there are no empty slots, wait */
+                sem_wait(&shared[0].empty);
+                /* If another thread uses the buffer, wait */
+                sem_wait(&shared[0].mutex);
+                shared[0].buf[shared[0].in] = estrutura;
+                shared[0].in = (shared[0].in+1)%BUFF_SIZE;
+                fflush(stdout);
+                /* Release the buffer */
+                sem_post(&shared[0].mutex);
+                /* Increment the number of full slots */
+                sem_post(&shared[0].full);
+                count++;
+            }
+
+            fclose(archive);
+        }
         /* Prepare to write item to buf */
 
-        /* If there are no empty slots, wait */
-        sem_wait(&shared[0].empty);
-        /* If another thread uses the buffer, wait */
-        sem_wait(&shared[0].mutex);
-        shared[0].buf[shared[0].in] = estrutura[0]; //TODO
-        shared[0].in = (shared[0].in+1)%BUFF_SIZE;
-        fflush(stdout);
-        /* Release the buffer */
-        sem_post(&shared[0].mutex);
-        /* Increment the number of full slots */
-        sem_post(&shared[0].full);
-    }
     return NULL;
 }
 
-void *ConsumerProducer(void *arg)
-{
+void *ConsumerProducer(void *arg) {
     int i, item, index;
-
+    S *estrutura;
     index = *((int *)arg);
 
     for (i=0; i < NITERS; i++) {
 
-	/* Prepare to read item from buf */
-
+        //A partir daqui: lê do buffer compartilhado 0 *consome
+	    /* Prepare to read item from buf */
         /* If there are no filled slots, wait */
         sem_wait(&shared[0].full);
         /* If another thread uses the buffer, wait */
         sem_wait(&shared[0].mutex);
-        item = shared[0].buf[shared[0].out];
+        estrutura = shared[0].buf[shared[0].out];
         shared[0].out = (shared[0].out+1)%BUFF_SIZE;
-        printf("[CP1_%d] Consuming %d ...\n", index, item); fflush(stdout);
+        printf("[CP1_%d] Consuming ...\n", index);
+        fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[0].mutex);
         /* Increment the number of empty slots */
         sem_post(&shared[0].empty);
 
-	//Change consumed item
-	item += 500;
+        //multiplica as matrizes
+        estrutura->matrizC = multiplica_matriz(estrutura->matrizA, estrutura->matrizB, ORDER_MATRIX);
 
+        //A partir daqui: coloca no buffer compartilhado 1 produz
         /* Prepare to write item to buf */
-
         /* If there are no empty slots, wait */
         sem_wait(&shared[1].empty);
         /* If another thread uses the buffer, wait */
         sem_wait(&shared[1].mutex);
-        shared[1].buf[shared[1].in] = item;
+        shared[1].buf[shared[1].in] = estrutura;
         shared[1].in = (shared[1].in+1)%BUFF_SIZE;
-        printf("[CP1_%d] Producing %d ...\n", index, item); fflush(stdout);
+        printf("[CP1_%d] Producing...\n", index);
+        fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[1].mutex);
         /* Increment the number of full slots */
@@ -255,7 +265,8 @@ void *Consumer(void *arg)
         sem_wait(&shared[1].mutex);
         item = shared[1].buf[shared[1].out];
         shared[1].out = (shared[1].out+1)%BUFF_SIZE;
-        printf("[C_%d] Consuming %d ...\n", index, item); fflush(stdout);
+        printf("[C_%d] Consuming %d ...\n", index, item);
+        fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[1].mutex);
         /* Increment the number of empty slots */
