@@ -17,7 +17,7 @@
 
 
 typedef struct  {
-    char nome_arquivo_entrada[50];
+    char nome_arquivo_entrada[100];
     double **matrizA;
     double **matrizB;
     double **matrizC;
@@ -168,7 +168,7 @@ void *Producer(void *arg) {
             estrutura->matrizB = matrizes_retorno[0]->matrizB;
             //prenche o nome do arquivo de entrada
             strcpy(estrutura->nome_arquivo_entrada, str);
-            printf("Thread Produtora: Nome do Arquivo %s TID: %d\n", estrutura->nome_arquivo_entrada, index);
+            printf("[P_%d]: Nome do Arquivo %s TID: %d\n", index, estrutura->nome_arquivo_entrada, index);
             /* Buffer compartilhado*/
              /* If there are no empty slots, wait */
             sem_wait(&shared[0].empty);
@@ -203,7 +203,7 @@ void *ConsumerProducer(void *arg) {
         sem_wait(&shared[0].mutex);
         estrutura = shared[0].buf[shared[0].out];
         shared[0].out = (shared[0].out+1)%BUFF_SIZE;
-        printf("[CP1_%d] Colocando estrutura do buffer compartilhado...\n", index);
+        printf("[CP1_%d] Lendo %s do buffer compartilhado...\n", index, estrutura->nome_arquivo_entrada);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[0].mutex);
@@ -219,7 +219,7 @@ void *ConsumerProducer(void *arg) {
         sem_wait(&shared[1].mutex);
         shared[1].buf[shared[1].in] = estrutura;
         shared[1].in = (shared[1].in+1)%BUFF_SIZE;
-        printf("[CP1_%d] Escrevendo a estrutura no Buffer compartilhado...\n", index);
+        printf("[CP1_%d] Escrevendo %s no Buffer compartilhado...\n", index,  estrutura->nome_arquivo_entrada);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[1].mutex);
@@ -244,7 +244,7 @@ void *ConsumerProducerCP2(void *arg) {
         sem_wait(&shared[1].mutex);
         estrutura = shared[1].buf[shared[1].out];
         shared[1].out = (shared[1].out+1)%BUFF_SIZE;
-        printf("[CP2_%d] Colocando estrutura do buffer compartilhado em um ponteiro temporário...\n", index);
+        printf("[CP2_%d] Lendo %s do buffer compartilhado\n", index, estrutura->nome_arquivo_entrada);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[1].mutex);
@@ -263,7 +263,7 @@ void *ConsumerProducerCP2(void *arg) {
         sem_wait(&shared[2].mutex);
         shared[2].buf[shared[2].in] = estrutura;
         shared[2].in = (shared[2].in+1)%BUFF_SIZE;
-        printf("[CP2_%d] Colocando a estrutura no Buffer compartilhado...\n", index);
+        printf("[CP2_%d] Colocando %s no Buffer compartilhado...\n", index, estrutura->nome_arquivo_entrada);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[2].mutex);
@@ -288,7 +288,7 @@ void *ConsumerProducerCP3(void *arg) {
         sem_wait(&shared[2].mutex);
         estrutura = shared[2].buf[shared[2].out];
         shared[2].out = (shared[2].out+1)%BUFF_SIZE;
-        printf("[CP3_%d] Colocando estrutura do buffer compartilhado em um ponteiro temporário...\n", index);
+        printf("[CP3_%d] Lendo %s do buffer compartilhado\n", index, estrutura->nome_arquivo_entrada);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[2].mutex);
@@ -305,7 +305,7 @@ void *ConsumerProducerCP3(void *arg) {
         sem_wait(&shared[3].mutex);
         shared[3].buf[shared[3].in] = estrutura;
         shared[3].in = (shared[3].in+1)%BUFF_SIZE;
-        printf("[CP3_%d] Colocando a estrutura no Buffer compartilhado...\n", index);
+        printf("[CP3_%d] Colocando %s no Buffer compartilhado...\n", index, estrutura->nome_arquivo_entrada);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[3].mutex);

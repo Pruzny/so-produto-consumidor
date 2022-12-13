@@ -1,6 +1,6 @@
 from sys import argv
 from random import random
-from os import remove, listdir
+from os import remove, listdir, mkdir, path
 
 reserved = {
     "-n": "N",
@@ -29,6 +29,8 @@ J = int(values["J"])
 MIN = float(values["MIN"])
 MAX = float(values["MAX"])
 
+if not path.exists("files"):
+    mkdir("files")
 for filename in listdir("files"):
     if ".in" in filename:
         remove(f"files/{filename}")
