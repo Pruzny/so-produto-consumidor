@@ -39,7 +39,7 @@ for n in range(N):
         for i in range(I):
             for j in range(J):
                 value = random() * (MAX - MIN) + MIN
-                file.write(f"{value:.1f} ")
+                file.write(f"{value} ")
             file.write("\n")
         file.write("\n")
     file.close()

@@ -10,7 +10,6 @@
 #define NCP2        4		/* total number of consumers/producers CP1*/
 #define NCP3        3		/* total number of consumers/producers CP1*/
 #define NC          1		/* total number of consumers */
-#define NITERS      4		/* number of items produced/consumed */
 #define PATH "files/"       /* Diretório dos arquivos de entrada.in */
 #define N 5                 /* Quantidade de arquivos */
 #define ORDER_MATRIX 10     /**/
@@ -35,7 +34,6 @@ typedef struct {
     sem_t full;     	  /* keep track of the number of full spots */
     sem_t empty;    	  /* keep track of the number of empty spots */
     sem_t mutex;    	  /* enforce mutual exclusion to shared data */
-    int teste;
 } sbuf_t;
 
 sbuf_t shared[4];
@@ -44,16 +42,6 @@ typedef struct {
     double **matrizA;
     double **matrizB;
 } matrizes;
-
-void printMatrix(double **a, int order_matrix) {
-   for (int i = 0; i < order_matrix; i++) {
-        for (int j = 0; j < order_matrix; j++) {
-            printf("%lf ", a[i][j]);
-        }
-        printf("\n");
-   }
-   printf("\n");
-}
 
 double** alloc_matrix(int number_rows, int number_collumns) {
     double **matrix;
@@ -72,20 +60,6 @@ double* alloc_vetor(int order_vetor) {
     return v;
 }
 
-/*buffer tamanho fixo dinamico
-S ** alloc_struct_S(int n, int order_matrix, int order_vetor) {
-    S **structure = (S **) malloc(sizeof(S*)*n);
-     for (int i= 0; i < n; i++){
-        structure[i] = (S *) malloc(sizeof(S));
-        structure[i]->matrizA = alloc_matrix(order_matrix, order_matrix);
-        structure[i]->matrizB = alloc_matrix(order_matrix, order_matrix);
-        structure[i]->matrizC = alloc_matrix(order_matrix, order_matrix);
-        structure[i]->vetor = alloc_vetor(order_vetor);
-     }
-
-    return structure;
-}
-*/
 matrizes ** alloc_struct_matrizes(int n, int order_matrix) {
     matrizes **matrizes_retornadas = (matrizes **) malloc(sizeof(matrizes*)*n);
     for (int i= 0; i < n; i++){
@@ -111,7 +85,7 @@ void read_matrix_archive(char *name_archive, double **a, double **b, int order_m
                 a[i][j] = n;
             }
         }
-        fscanf(archive_matrix, "\n", &n);
+        fscanf(archive_matrix, "\n");
         for (int i = 0; i < order_matrix; i++) {
             for (int j = 0; j < order_matrix; j++) {
                 fscanf(archive_matrix, "%lf ", &n);
@@ -128,29 +102,6 @@ matrizes **alloc_matrix_from_archive(char *name_archive, int order_matrix) {
     matrizes **matrizes1 = alloc_struct_matrizes(1, order_matrix);
     read_matrix_archive(name_archive, matrizes1[0]->matrizA, matrizes1[0]->matrizB, order_matrix);
     return matrizes1;
-}
-//antigo
-matrizes ** read_entrada_in(S **estrutura, char *name_archive, int order_matrix) {
-    FILE *archive;
-    int count = 0;
-    char path_archive[80];
-    matrizes **matrizes_retorno;
-    strcpy(path_archive, PATH);
-    archive = fopen(strcat(path_archive, name_archive), "r");
-    if (archive != NULL) {
-        char str[100];
-        while (!feof(archive)) {
-            fscanf(archive, "%s\n", str);
-            matrizes_retorno = alloc_matrix_from_archive(str, order_matrix);
-            estrutura[count]->matrizA = matrizes_retorno[0]->matrizA;
-            estrutura[count]->matrizB = matrizes_retorno[0]->matrizB;
-            count++;
-        }
-        fclose(archive);
-    } else {
-        printf("Houve um problema ao abrir o arquivo %s, verifique o diretório\n", name_archive);
-    }
-    return estrutura;
 }
 
 double** multiplica_matriz(double **a, double **b, int order_matrix) {
@@ -235,7 +186,6 @@ void *Producer(void *arg) {
         }
         fclose(archive);
     }
-    printf("IsadoraP\n");
     return NULL;
 }
 
@@ -275,9 +225,8 @@ void *ConsumerProducer(void *arg) {
         sem_post(&shared[1].mutex);
         /* Increment the number of full slots */
         sem_post(&shared[1].full);
-
     }
-    printf("Isadora1\n");
+    fflush(stdout);
     return NULL;
 }
 
@@ -286,7 +235,6 @@ void *ConsumerProducerCP2(void *arg) {
     S *estrutura;
     double *vetor;
     index = *((int *)arg);
-
     for (i=0; i < N; i++) {
 
         //Lê o buffer compartilhado
@@ -323,7 +271,7 @@ void *ConsumerProducerCP2(void *arg) {
         sem_post(&shared[2].full);
 
     }
-    printf("Isadora2\n");
+    fflush(stdout);
     return NULL;
 }
 
@@ -331,7 +279,6 @@ void *ConsumerProducerCP3(void *arg) {
     int i, index;
     S *estrutura;
     index = *((int *)arg);
-    ///perguntar pq ele quer que move da 2 pra 3. Fiz lendo da 2 e colocando na 3.
     for (i=0; i < N; i++) {
 
         //Lê o buffer compartilhado
@@ -365,19 +312,17 @@ void *ConsumerProducerCP3(void *arg) {
         /* Increment the number of full slots */
         sem_post(&shared[3].full);
     }
-    printf("Isadora3\n");
+    fflush(stdout);
     return NULL;
 }
 
-void *Consumer(void *arg)
-{
+void *Consumer(void *arg) {
     int i, index;
     S* item;
     index = *((int *)arg);
     FILE *out = fopen("saida.out", "w");
 
     for (i=0; i < N; i++) {
-        printf("%d\n", i);
         /* Prepare to read item from buf */
         /* If there are no filled slots, wait */
         sem_wait(&shared[3].full);
@@ -430,11 +375,11 @@ void *Consumer(void *arg)
 }
 
 int main() {
-    pthread_t idP, idC, idCP1, idCP2, idCP3;
+    pthread_t idP[NP], idC[NC], idCP1[NCP1], idCP2[NCP2], idCP3[NCP3];
     int index;
     int sP[NP], sC[NC], sCP1[NCP1], sCP2[NCP2], sCP3[NCP3];
 
-    for (index=0; index<3; index++) {
+    for (index=0; index < 4; index++) {
     	sem_init(&shared[index].full, 0, 0);
     	sem_init(&shared[index].empty, 0, BUFF_SIZE);
     	sem_init(&shared[index].mutex, 0, 1);
@@ -443,38 +388,47 @@ int main() {
     for (index = 0; index < NP; index++) {
        sP[index]=index;
        /* Create a new producer */
-       pthread_create(&idP, NULL, Producer, &sP[index]);
+       pthread_create(&idP[index], NULL, Producer, &sP[index]);
     }
 
     for (index = 0; index < NCP1; index++) {
        sCP1[index]=index;
        /* Create a new producer */
-       pthread_create(&idCP1, NULL, ConsumerProducer, &sCP1[index]);
+       pthread_create(&idCP1[index], NULL, ConsumerProducer, &sCP1[index]);
     }
 
     for (index = 0; index < NCP2; index++) {
        sCP2[index]=index;
        /* Create a new producer */
-       pthread_create(&idCP2, NULL, ConsumerProducerCP2, &sCP2[index]);
+       pthread_create(&idCP2[index], NULL, ConsumerProducerCP2, &sCP2[index]);
     }
 
     for (index = 0; index < NCP3; index++) {
        sCP3[index]=index;
        /* Create a new producer */
 
-       pthread_create(&idCP3, NULL, ConsumerProducerCP3, &sCP3[index]);
+       pthread_create(&idCP3[index], NULL, ConsumerProducerCP3, &sCP3[index]);
     }
 
     for (index = 0; index < NC; index++) {
        sC[index]=index;
        /* Create a new consumer */
-       pthread_create(&idC, NULL, Consumer, &sC[index]);
-       pthread_join(idC, NULL);
+       fflush(stdout);
+       pthread_create(&idC[index], NULL, Consumer, &sC[index]);
+       pthread_join(idC[index], NULL);
     }
-    pthread_cancel(idP);
-    pthread_cancel(idCP1);
-    pthread_cancel(idCP2);
-    pthread_cancel(idCP3);
+
+    for (index = 0; index < NCP1; index++) {
+        pthread_cancel(idCP1[index]);
+    }
+
+    for (index = 0; index < NCP2; index++) {
+        pthread_cancel(idCP2[index]);
+    }
+
+    for (index = 0; index < NCP3; index++) {
+        pthread_cancel(idCP3[index]);
+    }
 
     pthread_exit(NULL);
 }
