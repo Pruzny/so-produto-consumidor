@@ -140,8 +140,6 @@ double sum_el_vetor(double * vetor, int order_vetor) {
 
 void *Producer(void *arg) {
     int index = *((int *)arg);
-    //alocando a estrutura S
-    S *estrutura = (S*)malloc(sizeof(S));
     //Criando o ponteiro para o arquivo
     FILE *archive;
     //Criando o ponteiro de ponteiro para alocar as matrizes que serão retornadas
@@ -159,6 +157,8 @@ void *Producer(void *arg) {
         char str[100];
         //enquanto o arquivo não acabar
         while (!feof(archive)) {
+            //alocando a estrutura S
+            S *estrutura = (S*)malloc(sizeof(S));
             fscanf(archive, "%s\n", str);
 
             //Receber uma matriz baseado no matrizN.in que foi lido e colocado em str
