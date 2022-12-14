@@ -13,15 +13,15 @@
 #define PATH "files/"       /* Diretório dos arquivos de entrada.in */
 #define N 50                /* Quantidade de arquivos */
 #define ORDER_MATRIX 10     /**/
-#define ORDER_VETOR 10
+#define ORDER_VECTOR 10
 
 
 typedef struct  {
-    char nome_arquivo_entrada[100];
-    double **matrizA;
-    double **matrizB;
-    double **matrizC;
-    double *vetor;
+    char filename[100];
+    double **matrixA;
+    double **matrixB;
+    double **matrixC;
+    double *vector;
     double E;
 
 } S;
@@ -39,9 +39,9 @@ typedef struct {
 sbuf_t shared[4];
 
 typedef struct {
-    double **matrizA;
-    double **matrizB;
-} matrizes;
+    double **matrixA;
+    double **matrixB;
+} arrays;
 
 double** alloc_matrix(int number_rows, int number_collumns) {
     double **matrix;
@@ -52,22 +52,22 @@ double** alloc_matrix(int number_rows, int number_collumns) {
     return matrix;
 }
 
-double* alloc_vetor(int order_vetor) {
-    double *v =  (double *)malloc(order_vetor * sizeof(double));
-    for(int i = 0; i < order_vetor; i++) {
+double* alloc_vector(int order_vector) {
+    double *v =  (double *)malloc(order_vector * sizeof(double));
+    for(int i = 0; i < order_vector; i++) {
         v[i] = 0;
     }
     return v;
 }
 
-matrizes ** alloc_struct_matrizes(int n, int order_matrix) {
-    matrizes **matrizes_retornadas = (matrizes **) malloc(sizeof(matrizes*)*n);
+arrays ** alloc_struct_arrays(int n, int order_matrix) {
+    arrays **arrays_retornadas = (arrays **) malloc(sizeof(arrays*)*n);
     for (int i= 0; i < n; i++){
-        matrizes_retornadas[i] = (matrizes *) malloc(sizeof(matrizes));
-        matrizes_retornadas[i]->matrizA = alloc_matrix(order_matrix,order_matrix);
-        matrizes_retornadas[i]->matrizB = alloc_matrix(order_matrix,order_matrix);
+        arrays_retornadas[i] = (arrays *) malloc(sizeof(arrays));
+        arrays_retornadas[i]->matrixA = alloc_matrix(order_matrix,order_matrix);
+        arrays_retornadas[i]->matrixB = alloc_matrix(order_matrix,order_matrix);
     }
-    return matrizes_retornadas;
+    return arrays_retornadas;
 }
 
 void read_matrix_archive(char *name_archive, double **a, double **b, int order_matrix) {
@@ -98,10 +98,10 @@ void read_matrix_archive(char *name_archive, double **a, double **b, int order_m
     }
 }
 
-matrizes **alloc_matrix_from_archive(char *name_archive, int order_matrix) {
-    matrizes **matrizes1 = alloc_struct_matrizes(1, order_matrix);
-    read_matrix_archive(name_archive, matrizes1[0]->matrizA, matrizes1[0]->matrizB, order_matrix);
-    return matrizes1;
+arrays **alloc_matrix_from_archive(char *name_archive, int order_matrix) {
+    arrays **arrays1 = alloc_struct_arrays(1, order_matrix);
+    read_matrix_archive(name_archive, arrays1[0]->matrixA, arrays1[0]->matrixB, order_matrix);
+    return arrays1;
 }
 
 double** multiplica_matriz(double **a, double **b, int order_matrix) {
@@ -119,21 +119,21 @@ double** multiplica_matriz(double **a, double **b, int order_matrix) {
 }
 
 double * sum_col_matrix(double **matrix, int order_matrix) {
-    double * vetor = alloc_vetor(ORDER_VETOR);
+    double * vector = alloc_vector(ORDER_VECTOR);
     for (int i = 0; i < order_matrix; i++)  {
         double sum = 0.0;
         for (int j = 0; j < order_matrix; j++)  {
             sum += matrix[j][i];
         }
-        vetor[i] = sum;
+        vector[i] = sum;
     }
-    return vetor;
+    return vector;
 }
 
-double sum_el_vetor(double * vetor, int order_vetor) {
+double sum_el_vector(double * vector, int order_vector) {
     double sum = 0;
-    for (int i=0; i < order_vetor; i++) {
-        sum += vetor[i];
+    for (int i=0; i < order_vector; i++) {
+        sum += vector[i];
     }
     return sum;
 }
@@ -142,8 +142,8 @@ void *Producer(void *arg) {
     int index = *((int *)arg);
     //Criando o ponteiro para o arquivo
     FILE *archive;
-    //Criando o ponteiro de ponteiro para alocar as matrizes que serão retornadas
-    matrizes **matrizes_retorno;
+    //Criando o ponteiro de ponteiro para alocar as arrays que serão retornadas
+    arrays **arrays_temp;
     int count = 0;
     //Para o Path depender do define PATH
     char path_archive[80];
@@ -162,13 +162,13 @@ void *Producer(void *arg) {
             fscanf(archive, "%s\n", str);
 
             //Receber uma matriz baseado no matrizN.in que foi lido e colocado em str
-            matrizes_retorno = alloc_matrix_from_archive(str, ORDER_MATRIX);
+            arrays_temp = alloc_matrix_from_archive(str, ORDER_MATRIX);
             //A estrutura recebe a matriz A e a matriz B
-            estrutura->matrizA = matrizes_retorno[0]->matrizA;
-            estrutura->matrizB = matrizes_retorno[0]->matrizB;
+            estrutura->matrixA = arrays_temp[0]->matrixA;
+            estrutura->matrixB = arrays_temp[0]->matrixB;
             //prenche o nome do arquivo de entrada
-            strcpy(estrutura->nome_arquivo_entrada, str);
-            printf("[P_%d]: Nome do Arquivo %s TID: %d\n", index, estrutura->nome_arquivo_entrada, index);
+            strcpy(estrutura->filename, str);
+            printf("[P_%d]: Nome do Arquivo %s TID: %d\n", index, estrutura->filename, index);
             /* Buffer compartilhado*/
              /* If there are no empty slots, wait */
             sem_wait(&shared[0].empty);
@@ -203,15 +203,15 @@ void *ConsumerProducer(void *arg) {
         sem_wait(&shared[0].mutex);
         estrutura = shared[0].buf[shared[0].out];
         shared[0].out = (shared[0].out+1)%BUFF_SIZE;
-        printf("[CP1_%d] Lendo %s do buffer compartilhado...\n", index, estrutura->nome_arquivo_entrada);
+        printf("[CP1_%d] Lendo %s do buffer compartilhado...\n", index, estrutura->filename);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[0].mutex);
         /* Increment the number of empty slots */
         sem_post(&shared[0].empty);
 
-        //multiplica as matrizes
-        estrutura->matrizC = multiplica_matriz(estrutura->matrizA, estrutura->matrizB, ORDER_MATRIX);
+        //multiplica as arrays
+        estrutura->matrixC = multiplica_matriz(estrutura->matrixA, estrutura->matrixB, ORDER_MATRIX);
         //Coloca estrutura no buffer compartilhado
         /* If there are no empty slots, wait */
         sem_wait(&shared[1].empty);
@@ -219,7 +219,7 @@ void *ConsumerProducer(void *arg) {
         sem_wait(&shared[1].mutex);
         shared[1].buf[shared[1].in] = estrutura;
         shared[1].in = (shared[1].in+1)%BUFF_SIZE;
-        printf("[CP1_%d] Escrevendo %s no Buffer compartilhado...\n", index,  estrutura->nome_arquivo_entrada);
+        printf("[CP1_%d] Escrevendo %s no Buffer compartilhado...\n", index,  estrutura->filename);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[1].mutex);
@@ -233,7 +233,7 @@ void *ConsumerProducer(void *arg) {
 void *ConsumerProducerCP2(void *arg) {
     int i, index;
     S *estrutura;
-    double *vetor;
+    double *vector;
     index = *((int *)arg);
     for (i=0; i < N; i++) {
 
@@ -244,7 +244,7 @@ void *ConsumerProducerCP2(void *arg) {
         sem_wait(&shared[1].mutex);
         estrutura = shared[1].buf[shared[1].out];
         shared[1].out = (shared[1].out+1)%BUFF_SIZE;
-        printf("[CP2_%d] Lendo %s do buffer compartilhado\n", index, estrutura->nome_arquivo_entrada);
+        printf("[CP2_%d] Lendo %s do buffer compartilhado\n", index, estrutura->filename);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[1].mutex);
@@ -252,9 +252,9 @@ void *ConsumerProducerCP2(void *arg) {
         sem_post(&shared[1].empty);
 
         //Somar a coluna de Matriz C
-        vetor = sum_col_matrix(estrutura->matrizC, ORDER_MATRIX);
-        //Coloca o vetor V na estrutura temporária
-        estrutura->vetor = vetor;
+        vector = sum_col_matrix(estrutura->matrixC, ORDER_MATRIX);
+        //Coloca o vector V na estrutura temporária
+        estrutura->vector = vector;
 
         //Coloca estrutura no buffer compartilhado
         /* If there are no empty slots, wait */
@@ -263,7 +263,7 @@ void *ConsumerProducerCP2(void *arg) {
         sem_wait(&shared[2].mutex);
         shared[2].buf[shared[2].in] = estrutura;
         shared[2].in = (shared[2].in+1)%BUFF_SIZE;
-        printf("[CP2_%d] Colocando %s no Buffer compartilhado...\n", index, estrutura->nome_arquivo_entrada);
+        printf("[CP2_%d] Colocando %s no Buffer compartilhado...\n", index, estrutura->filename);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[2].mutex);
@@ -288,15 +288,15 @@ void *ConsumerProducerCP3(void *arg) {
         sem_wait(&shared[2].mutex);
         estrutura = shared[2].buf[shared[2].out];
         shared[2].out = (shared[2].out+1)%BUFF_SIZE;
-        printf("[CP3_%d] Lendo %s do buffer compartilhado\n", index, estrutura->nome_arquivo_entrada);
+        printf("[CP3_%d] Lendo %s do buffer compartilhado\n", index, estrutura->filename);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[2].mutex);
         /* Increment the number of empty slots */
         sem_post(&shared[2].empty);
 
-        //Somar elementos do Vetor
-        estrutura->E = sum_el_vetor(estrutura->vetor, ORDER_VETOR);
+        //Somar elementos do vector
+        estrutura->E = sum_el_vector(estrutura->vector, ORDER_VECTOR);
 
         //Coloca estrutura no buffer compartilhado
         /* If there are no empty slots, wait */
@@ -305,7 +305,7 @@ void *ConsumerProducerCP3(void *arg) {
         sem_wait(&shared[3].mutex);
         shared[3].buf[shared[3].in] = estrutura;
         shared[3].in = (shared[3].in+1)%BUFF_SIZE;
-        printf("[CP3_%d] Colocando %s no Buffer compartilhado...\n", index, estrutura->nome_arquivo_entrada);
+        printf("[CP3_%d] Colocando %s no Buffer compartilhado...\n", index, estrutura->filename);
         fflush(stdout);
         /* Release the buffer */
         sem_post(&shared[3].mutex);
@@ -339,31 +339,31 @@ void *Consumer(void *arg) {
 
         //escrever no arquivo saida.out
         fprintf(out, "================================\n");
-        fprintf(out, "Entrada: %s\n", item->nome_arquivo_entrada);
+        fprintf(out, "Entrada: %s\n", item->filename);
         fprintf(out, "——————————–\n");
         for (int ii = 0; ii < ORDER_MATRIX; ii++) {
             for (int jj = 0; jj < ORDER_MATRIX; jj++) {
-                fprintf(out, "%lf ", item->matrizA[ii][jj]);
+                fprintf(out, "%lf ", item->matrixA[ii][jj]);
             }
             fprintf(out, "\n");
         }
         fprintf(out, "——————————–\n");
         for (int ii = 0; ii < ORDER_MATRIX; ii++) {
             for (int jj = 0; jj < ORDER_MATRIX; jj++) {
-                fprintf(out, "%lf ", item->matrizB[ii][jj]);
+                fprintf(out, "%lf ", item->matrixB[ii][jj]);
             }
             fprintf(out, "\n");
         }
         fprintf(out, "——————————–\n");
         for (int ii = 0; ii < ORDER_MATRIX; ii++) {
             for (int jj = 0; jj < ORDER_MATRIX; jj++) {
-                fprintf(out, "%lf ", item->matrizC[ii][jj]);
+                fprintf(out, "%lf ", item->matrixC[ii][jj]);
             }
             fprintf(out, "\n");
         }
         fprintf(out, "——————————–\n");
         for (int ii = 0; ii < ORDER_MATRIX; ii++) {
-            fprintf(out, "%lf\n", item->vetor[ii]);
+            fprintf(out, "%lf\n", item->vector[ii]);
         }
         fprintf(out, "——————————–\n");
         fprintf(out, "%lf\n", item->E);
