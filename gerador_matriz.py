@@ -3,17 +3,11 @@ from random import random
 from os import remove, listdir, mkdir, path
 
 reserved = {
-    "-n": "N",
-    "-i": "I",
-    "-j": "J",
     "-min": "MIN",
     "-max": "MAX",
 }
 
 values = {
-    "N": 50,
-    "I": 10,
-    "J": 10,
     "MIN": -1,
     "MAX": 1,
 }
@@ -23,9 +17,9 @@ for flag in reserved.keys():
         if argv[i] == flag:
             values[reserved[flag]] = argv[i + 1]
 
-N = int(values["N"])
-I = int(values["I"])
-J = int(values["J"])
+N = 50
+I = 10
+J = 10
 MIN = float(values["MIN"])
 MAX = float(values["MAX"])
 

@@ -11,7 +11,7 @@
 #define NCP3        3		/* total number of consumers/producers CP1*/
 #define NC          1		/* total number of consumers */
 #define PATH "files/"       /* Diretório dos arquivos de entrada.in */
-#define N 5                 /* Quantidade de arquivos */
+#define N 50                /* Quantidade de arquivos */
 #define ORDER_MATRIX 10     /**/
 #define ORDER_VETOR 10
 
@@ -120,8 +120,8 @@ double** multiplica_matriz(double **a, double **b, int order_matrix) {
 
 double * sum_col_matrix(double **matrix, int order_matrix) {
     double * vetor = alloc_vetor(ORDER_VETOR);
-    double sum = 0.0;
     for (int i = 0; i < order_matrix; i++)  {
+        double sum = 0.0;
         for (int j = 0; j < order_matrix; j++)  {
             sum += matrix[j][i];
         }
